@@ -1,0 +1,15 @@
+state_dbfile = "igor.sqlite"
+
+[channels]
+
+[channels.console]
+class = "Console"
+
+[reactors]
+
+[reactors.fortune]
+class = "Fortune"
+[reactors.echo]
+class = "Echo"
+[reactors.catpic]
+class = "CatPic"
