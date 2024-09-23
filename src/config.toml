@@ -4,6 +4,8 @@ state_dbfile = "igor.sqlite"
 
 [channels.console]
 class = "Console"
+[channels.telegram]
+class = "Telegram"
 
 [reactors]
 
