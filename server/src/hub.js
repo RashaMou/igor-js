@@ -30,7 +30,7 @@ export class Hub {
       this.config = JSON.parse(configContent);
       logger.info("Configuration loaded successfully");
     } catch (error) {
-      logger.error(`Error loading config: ${error}`);
+      logger.error(`Error loading config: ${error.message}`);
       throw error;
     }
   }
