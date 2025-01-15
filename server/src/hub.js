@@ -1,7 +1,6 @@
 import fs from "fs/promises";
 import path from "path";
 import { fileURLToPath } from "url";
-import TOML from "@iarna/toml";
 import { getLogger } from "./logging.js";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -28,7 +27,7 @@ export class Hub {
   async loadConfig(configPath) {
     try {
       const configContent = await fs.readFile(configPath, "utf-8");
-      this.config = TOML.parse(configContent);
+      this.config = JSON.parse(configContent);
       logger.info("Configuration loaded successfully");
     } catch (error) {
       logger.error(`Error loading config: ${error}`);
