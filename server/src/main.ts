@@ -11,7 +11,8 @@ async function main() {
   const logger = getLogger("main");
   logger.info("Igor starting up");
 
-  const configPath = path.join(__dirname, "config.toml");
+  const configPath = path.join(__dirname, "../config.json");
+  console.log(configPath);
 
   const hub = new Hub(configPath);
 
