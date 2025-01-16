@@ -3,27 +3,23 @@ import { getLogger } from "../logging.js";
 
 const logger = getLogger("HttpClient");
 
-/**
- * Send an HTTP request
- * @param {string} requestType - The HTTP method (GET or POST)
- * @param {string} url - The URL to send the request to
- * @param {Object} [args={}] - The query parameters (for GET) or body (for POST)
- * @param {Object} [optionalHeaders={}] - Additional headers to include in the request
- * @returns {Promise<Object|null>} The JSON response or null if the request failed
- */
-export async function sendRequest(
-  requestType,
-  url,
-  args = {},
-  optionalHeaders = {},
-) {
+export async function sendRequest<T>(
+  requestType: string,
+  url: string,
+  args: Record<string, string> = {},
+  optionalHeaders: Record<string, any> = {},
+): Promise<T | null> {
   const headers = {
     "Content-Type": "application/json",
     Accept: "application/json",
     ...optionalHeaders,
   };
 
-  let options = {
+  let options: {
+    method: string;
+    headers: Record<string, string>;
+    body?: string;
+  } = {
     method: requestType.toUpperCase(),
     headers: headers,
   };
@@ -40,7 +36,7 @@ export async function sendRequest(
   try {
     const response = await fetch(url, options);
     if (response.ok) {
-      return await response.json();
+      return (await response.json()) as T;
     } else {
       const errorText = await response.text();
       logger.error(
