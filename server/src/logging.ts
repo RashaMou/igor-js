@@ -1,6 +1,6 @@
 import winston from "winston";
 
-let logger;
+let logger: winston.Logger;
 
 export function setupLogging() {
   logger = winston.createLogger({
@@ -18,7 +18,7 @@ export function setupLogging() {
   });
 }
 
-export function getLogger(name) {
+export function getLogger(name: string): winston.Logger {
   if (!logger) {
     setupLogging();
   }

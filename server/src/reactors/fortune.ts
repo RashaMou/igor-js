@@ -1,16 +1,18 @@
-import { Reactor } from "./baseReactor.js";
-import { Response } from "../response.js";
+import { EventType } from "../types/EventType.js";
+import { ReactorType } from "../types/ReactorType.js";
+import { ResponseType } from "../types/ResponseType.js";
 
-export default class FortuneReactor extends Reactor {
-  constructor(hub) {
-    super(hub);
+export default class FortuneReactor implements ReactorType {
+  fortunes: string[];
+
+  constructor() {
     this.fortunes = [
       "I didn't come this far to only come this far",
       "Anything that you do, any accomplishment that you make, you have to work for",
     ];
   }
 
-  canHandle(event) {
+  canHandle(event: EventType): boolean {
     console.log("checking fortune reactor");
     return (
       event.eventType === "message" &&
@@ -18,9 +20,9 @@ export default class FortuneReactor extends Reactor {
     );
   }
 
-  async handle(event) {
+  async handle(event: EventType): Promise<ResponseType> {
     const fortune =
       this.fortunes[Math.floor(Math.random() * this.fortunes.length)];
-    return new Response(fortune, event.channel);
+    return { content: fortune, channel: event.channel } as ResponseType;
   }
 }

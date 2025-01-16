@@ -1,7 +1,6 @@
 import fs from "fs/promises";
 import path from "path";
 import { fileURLToPath } from "url";
-import TOML from "@iarna/toml";
 import { getLogger } from "./logging.js";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -12,8 +11,8 @@ const logger = getLogger("hub");
 export class Hub {
   constructor(configFile) {
     this.config = null;
-    this.channels = {};
-    this.reactors = [];
+    this.channels = new Map();
+    this.reactors = new Map();
     this.shutdownPromise = null;
     this.tasks = [];
     this.configFile = configFile;
@@ -21,17 +20,50 @@ export class Hub {
 
   async initialize() {
     await this.loadConfig(this.configFile);
-    await this.initializeChannels();
-    await this.initializeReactors();
+    await this.loadPlugins("channels");
+    await this.loadPlugins("reactors");
+  }
+
+  async loadPlugins(pluginType) {
+    if (!this.config || !this.config[pluginType]) {
+      logger.warn(`No ${pluginType} configuration found`);
+      return;
+    }
+
+    const pluginMap = this[pluginType];
+    const baseDir = pluginType;
+
+    for (const [pluginName, pluginConfig] of Object.entries(
+      this.config[pluginType],
+    )) {
+      const pluginPath = path.join(__dirname, baseDir, `${pluginName}.js`);
+
+      try {
+        const module = await import(pluginPath);
+        const PluginClass = module.default;
+
+        if (typeof PluginClass !== "function") {
+          throw new Error(`${pluginConfig.class} is not a constructor`);
+        }
+
+        const plugin = new PluginClass(this, pluginConfig);
+        pluginMap.set(pluginName, plugin);
+        logger.info(`Initialized ${pluginName} ${pluginType.slice(0, -1)}`); // remove 's' from end
+      } catch (error) {
+        logger.error(
+          `Failed to initialize ${pluginName} ${pluginType.slice(0, -1)}: ${error}`,
+        );
+      }
+    }
   }
 
   async loadConfig(configPath) {
     try {
       const configContent = await fs.readFile(configPath, "utf-8");
-      this.config = TOML.parse(configContent);
+      this.config = JSON.parse(configContent);
       logger.info("Configuration loaded successfully");
     } catch (error) {
-      logger.error(`Error loading config: ${error}`);
+      logger.error(`Error loading config: ${error.message}`);
       throw error;
     }
   }
@@ -95,33 +127,54 @@ export class Hub {
   async start() {
     await this.initialize();
 
-    const listeningPromises = Object.values(this.channels).map((channel) =>
-      channel.startListening(),
-    );
-    this.tasks.push(...listeningPromises);
-
-    this.shutdownPromise = new Promise((resolve) => {
-      process.on("SIGINT", () => {
-        this.signalShutdown();
-        resolve();
-      });
-    });
-
-    await Promise.race([this.shutdownPromise, ...this.tasks]);
-  }
-
-  signalShutdown() {
-    logger.info("Shutting down...");
-    for (const task of this.tasks) {
-      if (typeof task.cancel === "function") {
-        task.cancel();
+    for (const channel of this.channels.values()) {
+      try {
+        await channel.startListening();
+        this.activeChannels.add(channel);
+      } catch (error) {
+        logger.error(`Failed to start channel: ${error}`);
       }
     }
+
+    process.on("SIGINT", async () => {
+      logger.info("Received SIGINT (Ctrl+C). Shutting down...");
+      await this.signalShutdown();
+      process.exit(0);
+    });
+
+    return new Promise((resolve) => {
+      this.shutdownResolver = resolve;
+    });
+  }
+
+  async signalShutdown() {
+    if (this.isShuttingDown) return;
+    this.isShuttingDown = true;
+
+    logger.info("Shutting down channels...");
+    const shutdownPromises = [];
+
+    for (const channel of this.activeChannels) {
+      shutdownPromises.push(
+        channel.stopListening().catch((error) => {
+          logger.error(`Error stopping channel ${channel.name}:`, error);
+        }),
+      );
+    }
+
+    await Promise.allSettled(shutdownPromises);
+    this.activeChannels.clear();
+
+    if (this.shutdownResolver) {
+      this.shutdownResolver();
+    }
+
+    logger.info("Shutdown complete.");
   }
 
   async processEvent(event) {
     logger.info(`Processing event: ${JSON.stringify(event)}`);
-    for (const reactor of this.reactors) {
+    for (const reactor of this.reactors.values()) {
       if (reactor.canHandle(event)) {
         logger.info(`Reactor ${reactor.constructor.name} handling event`);
         const response = await reactor.handle(event);
@@ -135,9 +188,9 @@ export class Hub {
   }
 
   async sendChannelResponse(event, response) {
-    const channelName = event.channel;
-    if (this.channels[channelName]) {
-      await this.channels[channelName].sendResponse(event, response);
+    const channel = this.channels.get(event.channel);
+    if (channel) {
+      await channel.sendResponse(event, response);
     } else {
       logger.warn(`Channel ${channelName} not found`);
     }

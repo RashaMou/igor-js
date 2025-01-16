@@ -1,0 +1,22 @@
+{
+  "state_dbfile": "igor.sqlite",
+  "channels": {
+    "console": {
+      "class": "Console"
+    },
+    "telegram": {
+      "class": "Telegram"
+    }
+  },
+  "reactors": {
+    "fortune": {
+      "class": "Fortune"
+    },
+    "echo": {
+      "class": "Echo"
+    },
+    "catpic": {
+      "class": "CatPic"
+    }
+  }
+}
